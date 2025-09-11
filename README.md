@@ -1,5 +1,5 @@
 # marquee
-a simple program about marquee
+a simple program about marquee  
 [Go Website](https://klhrd.github.io/marquee/)
 
 ---
