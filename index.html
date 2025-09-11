@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全螢幕跑馬燈產生器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Roboto+Mono&family=Kaisei+Tokumin:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --text-color: #FFFFFF;
+            --bg-color: #111827;
+            --font-size: 15; /* vh */
+            --animation-duration: 20; /* seconds */
+            --font-family: 'Noto Sans TC', sans-serif;
+            --text-shadow: none;
+        }
+
+        body {
+            background: var(--bg-color);
+            color: white;
+            overflow: hidden; /* 隱藏滾動條 */
+            transition: background 0.3s;
+        }
+
+        /* 跑馬燈容器 */
+        .marquee-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start; /* 從右邊開始 */
+        }
+
+        /* 跑馬燈文字 */
+        .marquee-text {
+            color: var(--text-color);
+            font-family: var(--font-family);
+            font-size: calc(var(--font-size) * 1vh);
+            font-weight: bold;
+            white-space: pre;
+            text-shadow: var(--text-shadow);
+            will-change: transform;
+            animation-name: marquee;
+            animation-duration: calc(var(--animation-duration) * 1s);
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+        }
+        
+        /* 跑馬燈動畫 */
+        @keyframes marquee {
+            from { transform: translateX(100vw); }
+            to { transform: translateX(-100%); }
+        }
+        
+        @keyframes marquee-reverse {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(100vw); }
+        }
+
+        .marquee-text.reversed {
+            animation-name: marquee-reverse;
+        }
+
+        /* 設定選單 */
+        #settings-menu {
+            transition: transform 0.3s ease-in-out;
+            transform: translateX(-100%);
+            z-index: 100;
+        }
+
+        #settings-menu.open {
+            transform: translateX(0);
+        }
+        
+        /* 選單按鈕 */
+        .control-btn { z-index: 110; }
+        #menu-toggle.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* 客製化拉桿樣式 */
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #3b82f6; cursor: pointer; border-radius: 50%; }
+        input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; background: #3b82f6; cursor: pointer; border-radius: 50%; }
+
+        /* Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4b5563; transition: .4s; border-radius: 28px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #2563eb; }
+        input:checked + .slider:before { transform: translateX(22px); }
+    </style>
+</head>
+<body class="overflow-hidden">
+
+    <!-- 跑馬燈顯示區域 -->
+    <div class="marquee-container">
+        <div id="marquee-text" class="marquee-text">這是範例文字... Hello World! 
+ 支援換行！ 		 也支援Tab縮排！</div>
+    </div>
+
+    <!-- 控制按鈕 -->
+    <div class="fixed top-4 left-4 flex items-center space-x-2">
+         <button id="menu-toggle" class="control-btn p-2 bg-gray-700/50 hover:bg-gray-600/70 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-opacity">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+        </button>
+        <button id="play-pause-btn" class="control-btn p-2 bg-gray-700/50 hover:bg-gray-600/70 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <!-- Icon will be inserted by JS -->
+        </button>
+    </div>
+
+    <!-- 設定選單面板 -->
+    <div id="settings-menu" class="fixed top-0 left-0 h-full w-80 md:w-96 bg-gray-800 shadow-lg p-6 overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-white">選單</h2>
+            <button id="close-menu" class="p-2 hover:bg-gray-700 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+        </div>
+
+        <div class="space-y-6">
+            <!-- 內容 -->
+            <div>
+                <h3 class="text-lg font-semibold text-blue-300 mb-3">內容</h3>
+                <textarea id="text-input" rows="4" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5" placeholder="輸入文字..."></textarea>
+            </div>
+            <hr class="border-gray-600">
+            <!-- 動畫效果 -->
+            <div>
+                <h3 class="text-lg font-semibold text-blue-300 mb-3">動畫效果</h3>
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-medium text-gray-300">反向滾動</label>
+                    <label class="switch"><input type="checkbox" id="reverse-toggle"><span class="slider"></span></label>
+                </div>
+                <div class="mt-4 space-y-2">
+                    <label class="block text-sm font-medium text-gray-300">滾動速度 (秒)</label>
+                    <div class="flex items-center space-x-2">
+                        <button id="speed-minus" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md">-</button>
+                        <input type="range" id="speed-slider" min="1" max="150" value="20" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                        <input type="number" id="speed-input" value="20" class="w-20 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg text-center p-1.5">
+                        <button id="speed-plus" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md">+</button>
+                    </div>
+                </div>
+            </div>
+            <hr class="border-gray-600">
+            <!-- 外觀樣式 -->
+            <div>
+                <h3 class="text-lg font-semibold text-blue-300 mb-3">外觀樣式</h3>
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-medium text-gray-300">文字發光效果</label>
+                    <label class="switch"><input type="checkbox" id="glow-toggle"><span class="slider"></span></label>
+                </div>
+                 <div class="mt-4 space-y-2">
+                    <label class="block text-sm font-medium text-gray-300">字體大小</label>
+                    <div class="flex items-center space-x-2">
+                        <button id="size-minus" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md">-</button>
+                        <input type="range" id="size-slider" min="1" max="100" value="15" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                        <input type="number" id="size-input" value="15" class="w-20 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg text-center p-1.5">
+                        <button id="size-plus" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md">+</button>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <label for="font-select" class="block mb-2 text-sm font-medium text-gray-300">字體</label>
+                    <select id="font-select" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"></select>
+                </div>
+                <div class="mt-4 space-y-2">
+                    <label class="block text-sm font-medium text-gray-300">字體顏色</label>
+                    <div class="flex items-center space-x-3 p-2 bg-gray-700 rounded-lg">
+                        <input type="color" id="color-picker" value="#FFFFFF" class="w-10 h-10 p-0 border-none rounded cursor-pointer bg-transparent" style="-webkit-appearance: none; appearance: none;">
+                        <span id="color-value" class="font-mono"></span>
+                    </div>
+                </div>
+                <div class="mt-4 space-y-2">
+                    <label class="block text-sm font-medium text-gray-300">背景顏色</label>
+                    <div class="flex items-center space-x-3 p-2 bg-gray-700 rounded-lg">
+                        <input type="color" id="bg-color-picker" value="#111827" class="w-10 h-10 p-0 border-none rounded cursor-pointer bg-transparent" style="-webkit-appearance: none; appearance: none;">
+                        <span id="bg-color-value" class="font-mono"></span>
+                    </div>
+                </div>
+            </div>
+            <hr class="border-gray-600">
+            <!-- 其他 -->
+            <div>
+                 <h3 class="text-lg font-semibold text-blue-300 mb-3">其他</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="save-settings-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-3 rounded-lg text-sm">儲存設定</button>
+                    <button id="load-settings-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-3 rounded-lg text-sm">載入設定</button>
+                </div>
+                <button id="fullscreen-btn" class="mt-2 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">進入全螢幕</button>
+                <button id="how-to-use-btn" class="mt-4 w-full text-blue-300 hover:text-blue-400 font-medium py-2 rounded-lg text-center">功能說明</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 使用教學 Modal -->
+    <div id="how-to-use-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[200]">
+        <div class="bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h2 class="text-xl font-bold">使用說明</h2>
+                <button id="close-how-to-use-modal-btn" class="p-2 rounded-full hover:bg-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="flex-grow overflow-y-auto p-6 space-y-4 text-gray-300">
+                <h3 class="text-lg font-semibold text-white">基本操作</h3>
+                <ul class="list-disc list-inside space-y-2">
+                    <li><strong>開關選單:</strong> 點擊左上角的 ☰ 圖示來打開或關閉設定選單。</li>
+                    <li><strong>暫停/播放:</strong> 點擊 ☰ 圖示旁邊的 ▶/❚❚ 按鈕來控制跑馬燈的滾動。</li>
+                </ul>
+
+                <h3 class="text-lg font-semibold text-white">內容與動畫</h3>
+                <ul class="list-disc list-inside space-y-2">
+                    <li><strong>輸入文字:</strong> 在「內容」區塊的文字框中輸入你想顯示的文字。支援 <code>\n</code> 換行與 <code>\t</code> 縮排。</li>
+                    <li><strong>反向滾動:</strong> 開啟後，文字會由左至右滾動。</li>
+                    <li><strong>滾動速度:</strong> 調整文字滾動一輪所需的時間（秒），數字越大速度越慢。</li>
+                </ul>
+
+                <h3 class="text-lg font-semibold text-white">外觀樣式</h3>
+                 <ul class="list-disc list-inside space-y-2">
+                    <li><strong>文字發光:</strong> 為文字增添柔和的發光效果，在深色背景下更顯眼。</li>
+                    <li><strong>字體大小/顏色/背景色:</strong> 隨心所欲調整跑馬燈的視覺呈現。</li>
+                    <li><strong>字體:</strong> 提供多種內建字體供您選擇，改變跑馬燈的風格。</li>
+                </ul>
+
+                <h3 class="text-lg font-semibold text-white">其他功能</h3>
+                <ul class="list-disc list-inside space-y-2">
+                    <li><strong>儲存/載入設定:</strong> 將您目前的全部設定儲存在瀏覽器中，下次開啟時可以快速載入，不用重新設定！</li>
+                    <li><strong>全螢幕:</strong> 點擊進入全螢幕模式以獲得最佳體驗。若無法使用，可能是預覽環境限制，發佈成獨立網頁即可正常運作。</li>
+                </ul>
+
+                <!-- 隱藏 -->
+                <br>
+                <div class="small text-gray-400 dark:text-gray-600">
+                    <p>v1.3.0 2025-09-11</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const root = document.documentElement;
+            const marqueeText = document.getElementById('marquee-text');
+            const playPauseBtn = document.getElementById('play-pause-btn');
+
+            // --- 圖示 SVG ---
+            const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+            const pauseIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+            
+            let isPlaying = true;
+            
+            // --- UI 元素映射 ---
+            const ui = {
+                textInput: document.getElementById('text-input'),
+                colorPicker: document.getElementById('color-picker'),
+                colorValue: document.getElementById('color-value'),
+                bgColorPicker: document.getElementById('bg-color-picker'),
+                bgColorValue: document.getElementById('bg-color-value'),
+                fontSelect: document.getElementById('font-select'),
+                fullscreenBtn: document.getElementById('fullscreen-btn'),
+                menuToggle: document.getElementById('menu-toggle'),
+                closeMenu: document.getElementById('close-menu'),
+                settingsMenu: document.getElementById('settings-menu'),
+                reverseToggle: document.getElementById('reverse-toggle'),
+                glowToggle: document.getElementById('glow-toggle'),
+                saveBtn: document.getElementById('save-settings-btn'),
+                loadBtn: document.getElementById('load-settings-btn'),
+                howToUseBtn: document.getElementById('how-to-use-btn'),
+                howToUseModal: document.getElementById('how-to-use-modal'),
+                closeHowToUseBtn: document.getElementById('close-how-to-use-modal-btn'),
+            };
+
+            const fonts = {
+                "'Noto Sans TC', sans-serif": "思源黑體 (預設)",
+                "'Kaisei Tokumin', serif": "日式明體",
+                "'Roboto Mono', monospace": "等寬程式字",
+                "Arial, sans-serif": "Arial",
+                "'Courier New', monospace": "Courier New",
+                "Georgia, serif": "Georgia",
+                "Impact, sans-serif": "Impact",
+                "'Comic Sans MS', cursive": "Comic Sans MS"
+            };
+
+            function populateFonts() {
+                for (const font of Object.keys(fonts)) {
+                    const option = document.createElement('option');
+                    option.value = font;
+                    option.textContent = fonts[font];
+                    ui.fontSelect.appendChild(option);
+                }
+            }
+
+            // --- 功能函數 ---
+            const actions = {
+                updateMarqueeText: () => {
+                    const rawText = ui.textInput.value;
+                    marqueeText.textContent = rawText.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+                    marqueeText.style.animation = 'none';
+                    marqueeText.offsetHeight;
+                    marqueeText.style.animation = '';
+                },
+                togglePlayPause: () => {
+                    isPlaying = !isPlaying;
+                    marqueeText.style.animationPlayState = isPlaying ? 'running' : 'paused';
+                    playPauseBtn.innerHTML = isPlaying ? pauseIcon : playIcon;
+                },
+                updateColor: (picker, valueDisplay, property) => {
+                    root.style.setProperty(property, picker.value);
+                    valueDisplay.textContent = picker.value.toUpperCase();
+                },
+                toggleReverse: () => marqueeText.classList.toggle('reversed', ui.reverseToggle.checked),
+                toggleGlow: () => root.style.setProperty('--text-shadow', ui.glowToggle.checked ? '0 0 8px rgba(255, 255, 255, 0.7), 0 0 16px rgba(255, 255, 255, 0.5)' : 'none'),
+                saveSettings: () => {
+                    const settings = {
+                        text: ui.textInput.value,
+                        speed: document.getElementById('speed-input').value,
+                        size: document.getElementById('size-input').value,
+                        textColor: ui.colorPicker.value,
+                        bgColor: ui.bgColorPicker.value,
+                        font: ui.fontSelect.value,
+                        isReversed: ui.reverseToggle.checked,
+                        hasGlow: ui.glowToggle.checked
+                    };
+                    localStorage.setItem('marqueeSettings', JSON.stringify(settings));
+                    alert('設定已儲存！');
+                },
+                loadSettings: () => {
+                    const settings = JSON.parse(localStorage.getItem('marqueeSettings'));
+                    if (settings) {
+                        ui.textInput.value = settings.text;
+                        document.getElementById('speed-slider').value = settings.speed;
+                        document.getElementById('speed-input').value = settings.speed;
+                        document.getElementById('size-slider').value = settings.size;
+                        document.getElementById('size-input').value = settings.size;
+                        ui.colorPicker.value = settings.textColor;
+                        ui.bgColorPicker.value = settings.bgColor;
+                        ui.fontSelect.value = settings.font;
+                        ui.reverseToggle.checked = settings.isReversed;
+                        ui.glowToggle.checked = settings.hasGlow;
+                        
+                        // Apply all settings
+                        applyAllSettings();
+                        alert('設定已載入！');
+                    } else {
+                        alert('找不到已儲存的設定。');
+                    }
+                }
+            };
+
+            function applyAllSettings() {
+                actions.updateMarqueeText();
+                document.getElementById('speed-slider').dispatchEvent(new Event('input'));
+                document.getElementById('size-slider').dispatchEvent(new Event('input'));
+                ui.colorPicker.dispatchEvent(new Event('input'));
+                ui.bgColorPicker.dispatchEvent(new Event('input'));
+                ui.fontSelect.dispatchEvent(new Event('change'));
+                actions.toggleReverse();
+                actions.toggleGlow();
+            }
+
+            function setupSliderControl(type) {
+                const slider = document.getElementById(`${type}-slider`);
+                const input = document.getElementById(`${type}-input`);
+                const minusBtn = document.getElementById(`${type}-minus`);
+                const plusBtn = document.getElementById(`${type}-plus`);
+                const property = type === 'speed' ? '--animation-duration' : '--font-size';
+                
+                const updateValue = (value) => {
+                    const intValue = parseInt(value, 10);
+                    const min = parseInt(slider.min, 10);
+                    const max = parseInt(slider.max, 10);
+                    if (isNaN(intValue)) return;
+                    const clampedValue = Math.max(min, Math.min(max, intValue));
+                    slider.value = clampedValue;
+                    input.value = clampedValue;
+                    root.style.setProperty(property, clampedValue);
+                };
+                slider.addEventListener('input', () => updateValue(slider.value));
+                input.addEventListener('change', () => updateValue(input.value));
+                minusBtn.addEventListener('click', () => updateValue(parseInt(input.value) - 1));
+                plusBtn.addEventListener('click', () => updateValue(parseInt(input.value) + 1));
+            }
+
+            // --- 事件監聽 ---
+            ui.textInput.addEventListener('input', actions.updateMarqueeText);
+            playPauseBtn.addEventListener('click', actions.togglePlayPause);
+            ui.colorPicker.addEventListener('input', () => actions.updateColor(ui.colorPicker, ui.colorValue, '--text-color'));
+            ui.bgColorPicker.addEventListener('input', () => actions.updateColor(ui.bgColorPicker, ui.bgColorValue, '--bg-color'));
+            ui.fontSelect.addEventListener('change', (e) => root.style.setProperty('--font-family', e.target.value));
+            ui.reverseToggle.addEventListener('change', actions.toggleReverse);
+            ui.glowToggle.addEventListener('change', actions.toggleGlow);
+            ui.saveBtn.addEventListener('click', actions.saveSettings);
+            ui.loadBtn.addEventListener('click', actions.loadSettings);
+            
+            ui.menuToggle.addEventListener('click', () => { ui.settingsMenu.classList.add('open'); ui.menuToggle.classList.add('hidden'); });
+            ui.closeMenu.addEventListener('click', () => { ui.settingsMenu.classList.remove('open'); ui.menuToggle.classList.remove('hidden'); });
+            
+            ui.fullscreenBtn.addEventListener('click', () => {
+                if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(err => console.error(err)); } 
+                else { document.exitFullscreen(); }
+            });
+            document.addEventListener('fullscreenchange', () => {
+                ui.fullscreenBtn.textContent = document.fullscreenElement ? '退出全螢幕' : '進入全螢幕';
+            });
+
+            // Modal listeners
+            ui.howToUseBtn.addEventListener('click', () => ui.howToUseModal.classList.remove('hidden'));
+            ui.closeHowToUseBtn.addEventListener('click', () => ui.howToUseModal.classList.add('hidden'));
+            ui.howToUseModal.addEventListener('click', (e) => {
+                if (e.target === ui.howToUseModal) ui.howToUseModal.classList.add('hidden');
+            });
+
+            // --- 初始化 ---
+            function init() {
+                playPauseBtn.innerHTML = pauseIcon;
+                populateFonts();
+                setupSliderControl('speed');
+                setupSliderControl('size');
+                applyAllSettings();
+                actions.updateColor(ui.colorPicker, ui.colorValue, '--text-color');
+                actions.updateColor(ui.bgColorPicker, ui.bgColorValue, '--bg-color');
+            }
+
+            init();
+        });
+    </script>
+</body>
+</html>
+
