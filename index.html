@@ -166,9 +166,9 @@
                     <label class="block text-sm font-medium text-gray-300">滾動速度 (<span id="speed-unit">字/秒</span>)</label>
                     <div class="slider-control flex items-center space-x-2">
                         <button id="speed-minus" class="minus-btn px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md">-</button>
-                        <input type="range" id="speed-slider" min="1" max="15" value="3" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                        <input type="range" id="speed-slider" min="0.1" max="15.0" value="3.0" step="0.1" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
                         <button id="speed-plus" class="plus-btn px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md">+</button>
-                        <input type="number" id="speed-input" value="3" class="w-20 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg text-center p-1.5">
+                        <input type="number" id="speed-input" value="3.0" step="0.1" class="w-20 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg text-center p-1.5">
                     </div>
                 </div>
                 <!-- 循環間隔 -->
@@ -354,7 +354,7 @@
 
             const defaultSettings = {
                 text: '快看看我做的跑馬燈網站，沒有廣告，只有文字的靜默與喧囂。每一個字元都是一個獨立的宇宙，在時間的長廊中無聲地奔跑。這是一個關於虛無的敘事，一個關於形狀與顏色的夢境，沒有開頭，沒有結尾，只有無盡的重複，直到宇宙的盡頭。',
-                speed: 3,
+                speed: 3.0,
                 size: 15,
                 interval: 0,
                 lineHeight: 1.5,
@@ -386,48 +386,43 @@
                 const speed = parseFloat(document.getElementById('speed-input').value);
                 const isVertical = ui.scrollModeToggle.checked;
 
-                // 暫停動畫以正確測量尺寸
                 marqueeText.style.animationName = 'none';
-                // 強制重排以獲取最新尺寸
                 marqueeText.offsetHeight; 
 
-                let duration = 20; // 預設時長
+                let duration = 20; 
                 if (speed > 0 && text.length > 0) {
                     if (isVertical) {
                         const elementHeight = marqueeText.offsetHeight;
                         const containerHeight = marqueeContainer.offsetHeight;
                         if (elementHeight > 0) {
-                            const lineCount = (text.match(/\n/g) || []).length + 1;
-                            // 總距離 = 容器高度 + 元素高度
-                            // 根據 容器/元素 比例計算時間因子，確保速度恆定
-                            const durationFactor = (containerHeight / elementHeight) + 1;
-                            duration = durationFactor * (lineCount / speed);
+                            const computedLineHeightString = window.getComputedStyle(marqueeText).getPropertyValue('line-height');
+                            const computedLineHeight = parseFloat(computedLineHeightString);
+                            if (computedLineHeight > 0) {
+                                const speedInPixelsPerSecond = speed * computedLineHeight;
+                                const totalDistance = containerHeight + elementHeight;
+                                duration = totalDistance / speedInPixelsPerSecond;
+                            }
                         }
-                    } else {
+                    } else { 
                         const elementWidth = marqueeText.offsetWidth;
                         const containerWidth = marqueeContainer.offsetWidth;
                         if (elementWidth > 0) {
-                            const charCount = text.length;
-                             // 總距離 = 容器寬度 + 元素寬度
-                            const durationFactor = (containerWidth / elementWidth) + 1;
-                            duration = durationFactor * (charCount / speed);
+                            const totalDistance = containerWidth + elementWidth;
+                            const avgCharWidth = elementWidth / text.length;
+                            const speedInPixelsPerSecond = speed * avgCharWidth;
+                            duration = totalDistance / speedInPixelsPerSecond;
                         }
                     }
                 }
 
-                duration = Math.max(0.1, duration); // 確保時長不為零或負數
+                duration = Math.max(0.1, duration);
 
                 marqueeText.style.animationPlayState = 'paused';
-                
-                // 設定新的時長
                 root.style.setProperty('--animation-duration', `${duration}s`);
-
-                // 重新應用動畫 class 和名稱
                 marqueeText.classList.toggle('vertical', isVertical);
                 marqueeText.classList.toggle('horizontal', !isVertical);
                 marqueeText.style.animationName = isVertical ? 'marquee-vertical' : 'marquee-horizontal';
 
-                // 如果本來是播放狀態，則繼續播放
                 if (isPlaying) {
                    marqueeText.style.animationPlayState = 'running';
                 }
@@ -544,6 +539,7 @@
                 const plusBtn = document.getElementById(`${type}-plus`);
                 const isFloat = options.isFloat || false;
                 const step = parseFloat(slider.step) || 1;
+                const precision = isFloat && String(step).includes('.') ? String(step).split('.')[1].length : 0;
 
                 const updateValue = (value) => {
                     let numValue = isFloat ? parseFloat(value) : parseInt(value, 10);
@@ -554,7 +550,7 @@
                     numValue = Math.max(min, Math.min(max, numValue));
                     
                     if (isFloat) {
-                        numValue = parseFloat(numValue.toFixed(2));
+                        numValue = parseFloat(numValue.toFixed(precision));
                     }
 
                     slider.value = numValue;
@@ -605,10 +601,17 @@
                 updateAnimation();
             });
 
-            setupSliderControl('speed', { callback: updateAnimation });
-            setupSliderControl('size', { callback: value => root.style.setProperty('--font-size', value) });
+            // --- 修正版滑桿設定 ---
+            setupSliderControl('speed', { callback: updateAnimation, isFloat: true });
+            setupSliderControl('size', { callback: (value) => { 
+                root.style.setProperty('--font-size', value); 
+                updateAnimation(); 
+            }});
             setupSliderControl('interval');
-            setupSliderControl('lineHeight', { callback: value => root.style.setProperty('--line-height', value), isFloat: true });
+            setupSliderControl('lineHeight', { callback: (value) => { 
+                root.style.setProperty('--line-height', value); 
+                updateAnimation(); 
+            }, isFloat: true });
             
             setupAlignmentControl(ui.hAlignButtons, applyHAlign);
             setupAlignmentControl(ui.vAlignButtons, applyVAlign);
@@ -676,9 +679,8 @@
                         <li><strong>儲存/載入設定:</strong> 將您目前的全部設定儲存於瀏覽器或從中載入。</li>
                         <li><strong>調回預設:</strong> 一鍵還原所有設定至程式的初始狀態。</li>
                     </ul>
-
-                    <div class="text-center text-gray-500 pt-4">
-                        <p>v2.1.0 2025-09-20</p>
+                     <div class="text-center text-gray-500 pt-4">
+                        <p>v2.1.2 2025-09-21</p>
                     </div>
                 `;
             }
